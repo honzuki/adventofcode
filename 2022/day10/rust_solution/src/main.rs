@@ -1,6 +1,7 @@
 use std::{env, error, fs, io};
 
 mod cpu;
+mod gif;
 
 use cpu::CPU;
 
@@ -11,9 +12,7 @@ fn read_input() -> Result<String, io::Error> {
     fs::read_to_string(input_path)
 }
 
-fn execute(input: &str) -> Result<CPU, String> {
-    let mut cpu = CPU::new();
-
+fn execute(input: &str, cpu: &mut CPU) -> Result<(), String> {
     for line in input.lines() {
         let tokens = line.split_ascii_whitespace().collect::<Vec<_>>();
         match &tokens[..] {
@@ -27,13 +26,17 @@ fn execute(input: &str) -> Result<CPU, String> {
         };
     }
 
-    Ok(cpu)
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let input = read_input()?;
 
-    let cpu = execute(&input)?;
+    let mut cpu = CPU::new();
+    let gif_gen = gif::GifGen::new();
+    cpu.hook_screen(gif_gen);
+    execute(&input, &mut cpu)?;
+
     println!("part 1 result: {}", cpu.get_signal_strength());
     print!("{}", cpu.display_screen());
 

@@ -1,16 +1,19 @@
-const SCREEN_WIDTH: usize = 40;
-const SCREEN_HEIGHT: usize = 6;
+pub const SCREEN_WIDTH: usize = 40;
+pub const SCREEN_HEIGHT: usize = 6;
 const SPRITE_SIZE: usize = 3;
 
-const LIT: char = '#';
-const DARK: char = '.';
+pub type Screen = [char; SCREEN_HEIGHT * SCREEN_WIDTH];
+
+pub const LIT: char = '#';
+pub const DARK: char = '.';
 
 pub struct CPU {
     reg_x: i32,
     cycle: usize,
     signal_strength: i32,
 
-    screen: [char; SCREEN_HEIGHT * SCREEN_WIDTH],
+    screen: Screen,
+    screen_hooker: Option<crate::gif::GifGen>,
 }
 
 impl CPU {
@@ -20,6 +23,7 @@ impl CPU {
             cycle: 0,
             signal_strength: 0,
             screen: [DARK; SCREEN_HEIGHT * SCREEN_WIDTH],
+            screen_hooker: None,
         }
     }
 
@@ -33,6 +37,10 @@ impl CPU {
         } else {
             DARK
         };
+
+        if let Some(handler) = &mut self.screen_hooker {
+            handler.encode_frame(self.screen.clone());
+        }
 
         // update cycle
         self.cycle += 1;
@@ -62,12 +70,16 @@ impl CPU {
 
         for row in 0..SCREEN_HEIGHT {
             for column in 0..SCREEN_WIDTH {
-                let idx = (40 * row) + column;
+                let idx = (SCREEN_WIDTH * row) + column;
                 result.push(self.screen[idx]);
             }
             result.push('\n');
         }
 
         result
+    }
+
+    pub fn hook_screen(&mut self, handler: crate::gif::GifGen) {
+        self.screen_hooker = Some(handler);
     }
 }
