@@ -3,7 +3,9 @@ use std::{
     cmp::Reverse,
     collections::{BinaryHeap, HashMap, HashSet},
     str::FromStr,
+    sync::{Arc, Mutex},
 };
+use threadpool::ThreadPool;
 
 type FlowRate = usize;
 type Time = usize;
@@ -78,7 +80,7 @@ impl State {
 #[derive(Debug)]
 pub struct Graph {
     start: State,
-    cost: Cost,
+    cost: Arc<Cost>,
 }
 
 impl Graph {
@@ -90,7 +92,7 @@ impl Graph {
                 time: 29,
                 score: 0,
             },
-            cost,
+            cost: Arc::new(cost),
         }
     }
 
@@ -111,7 +113,10 @@ impl Graph {
     }
 
     pub fn find_best_pair(&self) -> Score {
-        let mut max = 0;
+        // use threads to boost up calculation time
+        let pool = ThreadPool::new(8);
+
+        let shared_max = Arc::new(Mutex::new(0));
 
         let mut start = self.start.clone();
         start.time = 25; // we got an helper
@@ -121,31 +126,43 @@ impl Graph {
         while let Some(state) = frontier.pop() {
             // find a state that opens all the remaining valves
             // and check if they yield a better value than max
-            {
+            let cost_map = self.cost.clone();
+            let start_state = start.clone();
+            let comp_state = state.clone();
+            let shared_max = shared_max.clone();
+            pool.execute(move || {
+                let mut max = 0;
+
                 let mut second_frontier = Vec::new();
-                second_frontier.push(start.clone());
+                second_frontier.push(start_state);
 
                 'second_loop: while let Some(second_state) = second_frontier.pop() {
                     for valve_idx in 0..second_state.valves.len() {
-                        if state.valves[valve_idx].open && second_state.valves[valve_idx].open {
+                        if comp_state.valves[valve_idx].open && second_state.valves[valve_idx].open
+                        {
                             continue 'second_loop;
                         }
                     }
 
                     max = max.max(second_state.score + state.score);
 
-                    for next_state in second_state.next(&self.cost) {
+                    for next_state in second_state.next(&cost_map) {
                         second_frontier.push(next_state);
                     }
                 }
-            }
+
+                let mut shared_max = shared_max.lock().unwrap();
+                *shared_max = shared_max.max(max);
+            });
 
             for next_state in state.next(&self.cost) {
                 frontier.push(next_state);
             }
         }
 
-        max
+        pool.join();
+        let shared_max = shared_max.lock().unwrap();
+        *shared_max
     }
 }
 
