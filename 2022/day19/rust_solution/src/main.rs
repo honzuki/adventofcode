@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::{env, error, fs, io, str::FromStr};
 
 mod factory;
@@ -19,7 +20,7 @@ fn parse_input(input: &str) -> Result<Vec<Blueprint>, String> {
 
 fn part_1(input: &Vec<Blueprint>) -> usize {
     input
-        .iter()
+        .par_iter()
         .map(|blueprint| {
             let best_state = factory::dfs(factory::State::new(24), blueprint);
             factory::evaluate(&best_state, blueprint)
@@ -30,10 +31,12 @@ fn part_1(input: &Vec<Blueprint>) -> usize {
 fn part_2(input: &Vec<Blueprint>) -> usize {
     let mut mul = 1;
 
-    for geode_count in input.iter().take(3).map(|blueprint| {
-        let best_state = factory::dfs(factory::State::new(32), blueprint);
-        best_state.geode_count()
-    }) {
+    for geode_count in input
+        .par_iter()
+        .take(3)
+        .map(|blueprint| factory::dfs(factory::State::new(32), blueprint).geode_count())
+        .collect::<Vec<_>>()
+    {
         mul *= geode_count;
     }
 
