@@ -1,8 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet},
-    hash::Hash,
-    ops::ControlFlow,
-};
+use std::{collections::HashMap, hash::Hash};
+
+type Numbers = HashMap<String, Number>;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum Operation {
@@ -10,7 +8,6 @@ enum Operation {
     Sub,
     Mul,
     Div,
-    Match,
 }
 
 impl Operation {
@@ -20,7 +17,6 @@ impl Operation {
             "-" => Operation::Sub,
             "*" => Operation::Mul,
             "/" => Operation::Div,
-            "=" => Operation::Match,
             _ => return Err("unknown operation"),
         };
 
@@ -33,25 +29,24 @@ impl Operation {
             Self::Sub => left - right,
             Self::Mul => left * right,
             Self::Div => left / right,
-            Self::Match => left - right,
         }
     }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Equation<'a> {
-    left: &'a str,
+pub struct Equation {
+    left: String,
     op: Operation,
-    right: &'a str,
+    right: String,
 }
 
-impl<'a> Equation<'a> {
-    fn new(left: &'a str, op: Operation, right: &'a str) -> Equation<'a> {
+impl Equation {
+    fn new(left: String, op: Operation, right: String) -> Equation {
         Equation { left, op, right }
     }
 
-    fn evaluate(&self, numbers: &HashMap<&str, Number>) -> Option<i64> {
-        match (numbers.get(self.left), numbers.get(self.right)) {
+    fn evaluate(&self, numbers: &Numbers) -> Option<i64> {
+        match (numbers.get(&self.left), numbers.get(&self.right)) {
             (Some(left), Some(right)) => match (left.get_value(), right.get_value()) {
                 (Some(left), Some(right)) => Some(self.op.calculate(left, right)),
                 _ => None,
@@ -62,14 +57,14 @@ impl<'a> Equation<'a> {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Number<'a> {
-    name: &'a str,
+pub struct Number {
+    name: String,
     value: Option<i64>,
-    eq: Option<Equation<'a>>,
+    eq: Option<Equation>,
 }
 
-impl<'a> Number<'a> {
-    fn create_pure(name: &'a str, value: i64) -> Number<'a> {
+impl Number {
+    fn create_pure(name: String, value: i64) -> Number {
         Number {
             name,
             value: Some(value),
@@ -77,7 +72,7 @@ impl<'a> Number<'a> {
         }
     }
 
-    fn create_complex(name: &'a str, eq: Equation<'a>) -> Number<'a> {
+    fn create_complex(name: String, eq: Equation) -> Number {
         Number {
             name,
             value: None,
@@ -85,7 +80,7 @@ impl<'a> Number<'a> {
         }
     }
 
-    pub fn calc_value(&mut self, numbers: &HashMap<&'a str, Number<'a>>) -> Option<i64> {
+    pub fn calc_value(&mut self, numbers: &Numbers) -> Option<i64> {
         match self.value {
             Some(value) => Some(value),
             None => {
@@ -117,38 +112,38 @@ impl<'a> Number<'a> {
         Ok(())
     }
 
-    pub fn resolve_dep_list(
-        &mut self,
-        numbers: &mut HashMap<&'a str, Number<'a>>,
-        constraints: &HashMap<&'a str, Vec<&'a str>>,
-    ) {
+    pub fn get_dependencies(&self) -> Vec<&str> {
+        match &self.eq {
+            Some(eq) => vec![&eq.left, &eq.right],
+            None => vec![],
+        }
+    }
+
+    pub fn resolve_dep_list(&mut self, numbers: &mut Numbers) {
         if let Some(_) = self.calc_value(numbers) {
             return;
         }
 
         // resolve dependencies
-        for &dep in constraints.get(self.name).unwrap() {
+        for &dep in self.get_dependencies().iter() {
             let mut num = numbers.remove(dep).unwrap();
 
-            num.resolve_dep_list(numbers, constraints);
+            num.resolve_dep_list(numbers);
 
-            numbers.insert(dep, num);
+            numbers.insert(dep.clone().into(), num);
         }
 
         self.calc_value(numbers).unwrap();
     }
 
-    pub fn from_str(
-        s: &'a str,
-        constraints: &mut HashMap<&'a str, Vec<&'a str>>,
-    ) -> Result<Number<'a>, &'static str> {
+    pub fn from_str(s: &str) -> Result<Number, &'static str> {
         let parts: Vec<_> = s.split(' ').collect();
         if parts.len() < 1 {
             return Err("invalid equation");
         }
 
         let (name, _) = parts[0].split_once(':').unwrap();
-        let name = name.trim();
+        let name = name.trim().into();
 
         if parts.len() == 2 {
             let value: i64 = parts[1]
@@ -160,56 +155,51 @@ impl<'a> Number<'a> {
             return Err("invalid equation");
         }
 
-        let left = parts[1].trim();
+        let left = parts[1].trim().into();
         let op = Operation::new(parts[2])?;
-        let right = parts[3].trim();
-
-        constraints.insert(name, vec![left, right]);
+        let right = parts[3].trim().into();
 
         Ok(Number::create_complex(name, Equation::new(left, op, right)))
     }
 }
 
-pub fn build_numbers_map<'a>(
-    input: &'a str,
-) -> Result<(HashMap<&'a str, Number<'a>>, HashMap<&'a str, Vec<&'a str>>), &'static str> {
+pub fn build_numbers_map(input: &str) -> Result<Numbers, &'static str> {
     let mut numbers = HashMap::new();
-    let mut constraints = HashMap::new();
 
     for line in input.lines() {
-        let mut number = Number::from_str(line, &mut constraints)?;
+        let mut number = Number::from_str(line)?;
         number.calc_value(&mut numbers);
-        numbers.insert(number.name, number);
+        numbers.insert(number.name.clone(), number);
     }
 
-    Ok((numbers, constraints))
+    Ok(numbers)
 }
 
 pub fn find_controlled_value(
     controlled: &str,
     controlled_by: &str,
-    mut numbers: HashMap<&str, Number>,
-    constraints: &HashMap<&str, Vec<&str>>,
+    target_value: i64,
+    mut numbers: Numbers,
 ) -> i64 {
-    let modify_value = |numbers: &mut HashMap<&str, Number>, value| {
+    let modify_value = |numbers: &mut Numbers, value| {
         let controlled_by = numbers.get_mut(controlled_by).unwrap();
         let current = controlled_by.get_value().unwrap();
         controlled_by.set_value(current + value);
     };
 
-    let check_result = |numbers: &HashMap<&str, Number>| {
+    let check_result = |numbers: &Numbers| {
         let mut expanded = numbers.clone();
         let mut controlled = expanded.remove(controlled).unwrap();
-        controlled.resolve_dep_list(&mut expanded, constraints);
+        controlled.resolve_dep_list(&mut expanded);
         controlled.get_value().unwrap()
     };
 
     let mut step = 2i64.pow(40);
-    let mut last = check_result(&numbers).abs_diff(0);
+    let mut last = check_result(&numbers).abs_diff(target_value);
     while last != 0 {
         modify_value(&mut numbers, step);
 
-        let current = check_result(&numbers).abs_diff(0);
+        let current = check_result(&numbers).abs_diff(target_value);
         if current > last {
             // go the other way
             step *= -1;
@@ -233,19 +223,19 @@ mod tests {
 
     #[test]
     fn test_dep_list_resolve() {
-        let (mut numbers, constraints) = build_numbers_map(get_input()).unwrap();
+        let mut numbers = build_numbers_map(get_input()).unwrap();
 
         let mut root = numbers.remove("root").unwrap();
-        root.resolve_dep_list(&mut numbers, &constraints);
+        root.resolve_dep_list(&mut numbers);
         assert_eq!(root.value.unwrap(), 152)
     }
 
     #[test]
     fn test_find_controlled_value() {
-        let (mut numbers, constraints) = build_numbers_map(get_input()).unwrap();
-        numbers.get_mut("root").unwrap().set_op("=").unwrap();
+        let mut numbers = build_numbers_map(get_input()).unwrap();
+        numbers.get_mut("root").unwrap().set_op("-").unwrap();
 
-        let value = find_controlled_value("root", "humn", numbers, &constraints);
+        let value = find_controlled_value("root".into(), "humn".into(), 0, numbers);
         assert_eq!(value, 301)
     }
 

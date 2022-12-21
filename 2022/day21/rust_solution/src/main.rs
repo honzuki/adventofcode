@@ -11,17 +11,17 @@ fn read_input() -> io::Result<String> {
 }
 
 fn part_1(input: &str) -> Result<i64, &'static str> {
-    let (mut numbers, constraints) = build_numbers_map(input)?;
+    let mut numbers = build_numbers_map(input)?;
     let mut root = numbers.remove("root").unwrap();
-    root.resolve_dep_list(&mut numbers, &constraints);
+    root.resolve_dep_list(&mut numbers);
     Ok(root.get_value().unwrap())
 }
 
 fn part_2(input: &str) -> Result<i64, &'static str> {
-    let (mut numbers, constraints) = build_numbers_map(input)?;
-    numbers.get_mut("root").unwrap().set_op("=")?;
+    let mut numbers = build_numbers_map(input)?;
+    numbers.get_mut("root").unwrap().set_op("-")?;
 
-    Ok(find_controlled_value("root", "humn", numbers, &constraints))
+    Ok(find_controlled_value("root", "humn", 0, numbers))
 }
 
 fn main() -> Result<(), Box<dyn error::Error>> {
