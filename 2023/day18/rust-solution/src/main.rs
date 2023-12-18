@@ -1,30 +1,31 @@
 use digger::{DiggerErr, Plan};
-use terrain::Terrain;
 
 mod digger;
 mod position;
-mod rgb;
-mod terrain;
 
 fn part_1(input: &str) -> Result<usize, DiggerErr> {
     let plan: Plan = input.parse()?;
-    let terrain: Terrain = plan.into();
 
-    Ok(terrain.dig_interior())
+    Ok(plan.calculate_area())
+}
+
+fn part_2(input: &str) -> Result<usize, DiggerErr> {
+    let plan = Plan::from_rgb(input)?;
+
+    Ok(plan.calculate_area())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = rust_shared_utils::read_puzzle()?;
     println!("part 1: {}", part_1(&input)?);
+    println!("part 2: {}", part_2(&input)?);
 
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn part_1() {
-        let input = r#"R 6 (#70c710)
+    const INPUT: &str = r#"R 6 (#70c710)
 D 5 (#0dc571)
 L 2 (#5713f0)
 D 2 (#d2c081)
@@ -38,6 +39,13 @@ R 2 (#7807d2)
 U 3 (#a77fa3)
 L 2 (#015232)
 U 2 (#7a21e3)"#;
-        assert_eq!(super::part_1(input).unwrap(), 62);
+    #[test]
+    fn part_1() {
+        assert_eq!(super::part_1(INPUT).unwrap(), 62);
+    }
+
+    #[test]
+    fn part_2() {
+        assert_eq!(super::part_2(INPUT).unwrap(), 952408144115);
     }
 }

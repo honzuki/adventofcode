@@ -1,12 +1,5 @@
 use std::ops::{Add, AddAssign};
 
-pub const STEPS: [Position; 4] = [
-    Direction::Down.into_step(),
-    Direction::Left.into_step(),
-    Direction::Right.into_step(),
-    Direction::Up.into_step(),
-];
-
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
     pub x: isize,
@@ -44,12 +37,24 @@ pub enum Direction {
 }
 
 impl Direction {
-    pub const fn into_step(self) -> Position {
+    pub const fn into_step(self, size: isize) -> Position {
         match self {
-            Self::Down => Position::new(0, 1),
-            Self::Left => Position::new(-1, 0),
-            Self::Right => Position::new(1, 0),
-            Self::Up => Position::new(0, -1),
+            Self::Down => Position::new(0, size),
+            Self::Left => Position::new(-size, 0),
+            Self::Right => Position::new(size, 0),
+            Self::Up => Position::new(0, -size),
         }
+    }
+
+    pub fn from_digit(value: char) -> Option<Self> {
+        let dir = match value.to_digit(10)? {
+            0 => Self::Right,
+            1 => Self::Down,
+            2 => Self::Left,
+            3 => Self::Up,
+            _ => return None,
+        };
+
+        Some(dir)
     }
 }
