@@ -1,3 +1,5 @@
+pub mod ds;
+
 pub fn read_puzzle() -> std::io::Result<String> {
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() != 2 {
