@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     ops::{Add, AddAssign},
     str::FromStr,
 };
@@ -62,7 +62,7 @@ struct Pulse {
     value: bool,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExecuteResult {
     pub high: usize,
     pub low: usize,
@@ -131,6 +131,7 @@ impl Emulator {
         observe: &str,
         observe_value: bool,
     ) -> Result<usize, EmulatorErr> {
+        let mut visited = HashMap::new();
         for press in 1.. {
             let mut queue = vec![Pulse {
                 from: "button".into(),
@@ -139,12 +140,14 @@ impl Emulator {
             }];
 
             while let Some(pulse) = queue.pop() {
-                if pulse.from == observe && pulse.value == observe_value {
-                    return Ok(press);
-                }
-
                 let module = self.modules.get_mut(&pulse.target).unwrap();
                 if let Some(value) = module.transmit(&pulse.from, pulse.value) {
+                    if pulse.target == observe && value == observe_value {
+                        if let Some(pp) = visited.insert(pulse.target.clone(), press) {
+                            println!("{}", press - pp);
+                        }
+                    }
+
                     for output in module.outputs.iter() {
                         queue.push(Pulse {
                             from: pulse.target.clone(),
@@ -230,7 +233,9 @@ impl FromStr for Emulator {
             let outputs = outputs
                 .trim()
                 .split(',')
-                .map(|output| output.trim().to_string())
+                .map(|output| output.trim())
+                .filter(|output| !output.is_empty())
+                .map(|output| output.to_string())
                 .collect::<Vec<_>>();
 
             let ident = ident.trim();
@@ -243,7 +248,7 @@ impl FromStr for Emulator {
                     builder.add_module(ident[1..].into(), RawModule::conjunction(), outputs)
                 }
                 [b'%', ..] => builder.add_module(ident[1..].into(), RawModule::flipflop(), outputs),
-                _ => builder.add_module(ident.into(), RawModule::unknown(), outputs),
+                _ => return Err(EmulatorErr::BadModule(ident.into())),
             }
         }
 

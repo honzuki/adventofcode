@@ -83,3 +83,58 @@ impl Unknown {
     #[tracing::instrument]
     pub fn receive(&mut self, name: &str, from: &str, pulse: bool) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Conjunction, FlipFlop};
+
+    #[test]
+    fn test_flip_flop() {
+        let mut ff = FlipFlop { status: false };
+
+        assert!(ff.receive(true).is_none());
+        assert_eq!(ff.receive(false), Some(true));
+        assert!(ff.receive(true).is_none());
+        assert_eq!(ff.receive(false), Some(false));
+        assert_eq!(ff.receive(false), Some(true));
+        assert_eq!(ff.receive(false), Some(false));
+        assert!(ff.receive(true).is_none());
+        assert_eq!(ff.receive(false), Some(true));
+    }
+
+    #[test]
+    fn test_multi_input_conjunction() {
+        let mut con = Conjunction {
+            mem: Default::default(),
+            on: 0,
+        };
+
+        con.connect_input("a");
+        con.connect_input("b");
+        con.connect_input("c");
+        con.connect_input("d");
+
+        assert!(con.receive("a", true));
+        assert!(con.receive("a", true));
+        assert!(con.receive("b", true));
+        assert!(con.receive("c", true));
+        assert!(con.receive("a", false));
+        assert!(con.receive("d", true));
+        assert!(!con.receive("a", true));
+    }
+
+    #[test]
+    fn test_single_input_conjunction() {
+        let mut con = Conjunction {
+            mem: Default::default(),
+            on: 0,
+        };
+
+        con.connect_input("a");
+
+        assert!(!con.receive("a", true));
+        assert!(con.receive("a", false));
+        assert!(!con.receive("a", true));
+        assert!(con.receive("a", false));
+    }
+}

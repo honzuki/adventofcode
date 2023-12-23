@@ -6,10 +6,12 @@ mod modules;
 fn part_1(input: &str) -> Result<usize, EmulatorErr> {
     let mut emulator: Emulator = input.parse()?;
     let mut result = ExecuteResult::default();
-    for _ in 0..1000 {
+
+    for _ in 0..10000 {
         result += emulator.click();
     }
 
+    println!("{:?}", result);
     Ok(result.low * result.high)
 }
 
